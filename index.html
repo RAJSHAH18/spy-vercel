@@ -12,29 +12,30 @@
 }
 
 body {
-    background: radial-gradient(circle at center, #111 0%, #000 100%);
+    background: radial-gradient(circle, #111, #000);
     color: var(--neon-green);
     font-family: 'Courier New', monospace;
     padding: 20px;
 }
 
+/* container */
 .container {
     border: 2px solid #222;
     padding: 20px;
     border-radius: 12px;
     background: rgba(255,255,255,0.03);
-    box-shadow: 0 0 20px rgba(0,255,65,0.1);
 }
 
+/* title */
 h1 {
     color: var(--neon-pink);
     border-bottom: 2px solid var(--neon-pink);
     padding-bottom: 10px;
-    text-shadow: 0 0 15px var(--neon-pink);
 }
 
+/* player block */
 .player-hand {
-    margin: 25px 0;
+    margin: 20px 0;
     padding: 15px;
     border: 1px solid #333;
     border-radius: 10px;
@@ -48,65 +49,59 @@ h1 {
     display: block;
 }
 
+/* cards row */
 .cards-list {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
-    perspective: 1000px;
 }
 
-/* CARD DESIGN */
+/* CARD */
 .card {
     width: 70px;
     height: 100px;
-    border-radius: 10px;
-    background: linear-gradient(145deg, #ffffff, #dcdcdc);
-    color: black;
+    border-radius: 12px;
     position: relative;
     font-weight: bold;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-    transform-style: preserve-3d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #000;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.7);
     transition: transform 0.2s ease;
 }
 
-/* hover 3D */
+/* hover */
 .card:hover {
-    transform: rotateY(15deg) rotateX(10deg) scale(1.05);
+    transform: scale(1.08);
 }
 
 /* corners */
-.rank {
-    position: absolute;
-    font-size: 14px;
-}
-
 .rank.top {
+    position: absolute;
     top: 6px;
     left: 8px;
+    font-size: 12px;
 }
 
 .rank.bottom {
+    position: absolute;
     bottom: 6px;
     right: 8px;
     transform: rotate(180deg);
+    font-size: 12px;
 }
 
-/* center suit */
-.suit {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 24px;
+/* center */
+.center {
+    font-size: 22px;
 }
 
-/* red suits */
-.red {
-    color: red;
-}
-
+/* status */
 .status {
     font-size: 0.75em;
-    color: #555;
+    color: #666;
     text-align: right;
     margin-top: 10px;
 }
@@ -124,27 +119,30 @@ h1 {
 
 <script>
 
-// Convert numeric value → real card
+/* 🔥 PERFECT CARD FORMATTER (MATCHES YOUR BACKEND) */
 function formatCard(value) {
-    const suits = ["♠", "♥", "♦", "♣"];
+    if (!value || typeof value !== "string") return "";
 
-    const rankNum = value % 13 || 13;
-    const suit = suits[Math.floor(value / 13) % 4];
+    const parts = value.split(" ");
 
-    const rank =
-        rankNum === 1 ? "A" :
-        rankNum === 11 ? "J" :
-        rankNum === 12 ? "Q" :
-        rankNum === 13 ? "K" :
-        rankNum;
+    let color = parts[0];
+    let text = parts[1] || parts[0]; // handles WILD, +2, etc
 
-    const isRed = suit === "♥" || suit === "♦";
+    const colorMap = {
+        "Red": "#ff4d4d",
+        "Blue": "#4da6ff",
+        "Green": "#4dff88",
+        "Yellow": "#ffd24d"
+    };
+
+    let bg = colorMap[color] || "#222";
+    let textColor = colorMap[color] ? "#000" : "#fff";
 
     return `
-        <div class="card ${isRed ? "red" : ""}">
-            <div class="rank top">${rank}</div>
-            <div class="rank bottom">${rank}</div>
-            <div class="suit">${suit}</div>
+        <div class="card" style="background:${bg}; color:${textColor};">
+            <div class="rank top">${text}</div>
+            <div class="rank bottom">${text}</div>
+            <div class="center">${text}</div>
         </div>
     `;
 }
@@ -155,7 +153,7 @@ async function updateData() {
         const data = await res.json();
 
         let html = "";
-        const entries = Object.entries(data);
+        const entries = Object.entries(data || {});
 
         if (entries.length === 0) {
             document.getElementById('dashboard').innerHTML = "SIGNAL IDLE...";
@@ -163,11 +161,16 @@ async function updateData() {
         }
 
         for (const [uid, cards] of entries) {
+
             html += `
                 <div class="player-hand">
                     <span class="uid">TARGET_UID: ${uid}</span>
                     <div class="cards-list">
-                        ${cards.map(c => formatCard(c)).join('')}
+                        ${
+                            Array.isArray(cards)
+                            ? cards.map(c => formatCard(c)).join('')
+                            : ''
+                        }
                     </div>
                 </div>
             `;
