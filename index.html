@@ -2,239 +2,183 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>UNO ARC ENGINE</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<title>UNO LIVE TRACKER</title>
 
 <style>
 body {
     margin: 0;
-    background: radial-gradient(circle at center, #0a0f1f, #000);
-    font-family: sans-serif;
-    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: radial-gradient(circle at center, #0a0a0a, #000);
+    color: #fff;
 }
 
-/* TABLE */
+/* TABLE LAYOUT */
 .table {
-    width: 100vw;
-    height: 100vh;
-    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
 }
 
-/* CENTER PILE */
-.pile {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-/* PLAYERS */
+/* PLAYER BLOCK */
 .player {
-    position: absolute;
+    margin: 15px 0;
+    width: 95%;
+    max-width: 900px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 15px;
 }
 
-.bottom { bottom: 10px; left: 50%; transform: translateX(-50%); }
-.top { top: 10px; left: 50%; transform: translateX(-50%); }
-.left { left: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
-.right { right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); }
-
-/* ARC HAND */
-.hand {
-    position: relative;
-    height: 140px;
+.uid {
+    font-size: 14px;
+    color: #ff4df2;
+    margin-bottom: 10px;
 }
 
-/* CARD */
+/* CARD ROW */
+.cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* UNO CARD */
 .card {
     width: 70px;
     height: 110px;
-    position: absolute;
     border-radius: 14px;
-    transform-origin: center bottom;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.8);
-    cursor: pointer;
-}
-
-/* CARD INNER */
-.card-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 14px;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
+    font-size: 26px;
+    color: white;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
+    transition: transform 0.2s ease;
 }
 
-/* CENTER */
+.card:hover {
+    transform: scale(1.1);
+}
+
+/* corner numbers */
+.corner {
+    position: absolute;
+    font-size: 12px;
+}
+
+.top-left {
+    top: 6px;
+    left: 8px;
+}
+
+.bottom-right {
+    bottom: 6px;
+    right: 8px;
+    transform: rotate(180deg);
+}
+
+/* center oval */
 .center {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
     background: white;
     color: black;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 /* COLORS */
-.red { background:#e53935; }
-.blue { background:#1e88e5; }
-.green { background:#43a047; }
-.yellow { background:#fdd835; color:black;}
-.wild { background:conic-gradient(red,blue,green,yellow); }
+.red { background: #e53935; }
+.blue { background: #1e88e5; }
+.green { background: #43a047; }
+.yellow { background: #fdd835; color: black; }
+.wild { background: linear-gradient(45deg, red, blue, green, yellow); }
+
+/* STATUS */
+.status {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+}
 </style>
 </head>
 
 <body>
 
 <div class="table">
-    <div class="pile" id="pile"></div>
-    <div id="players"></div>
+    <h2>🎮 UNO LIVE TRACKER</h2>
+    <div id="dashboard">Connecting...</div>
+    <div class="status" id="status">SYNC: OFFLINE</div>
 </div>
 
 <script>
 
-/* ===== ENGINE STATE ===== */
-let lastState = {};
-let lastMove = null;
+/* 🔥 UNO CARD BUILDER */
+function formatCard(value) {
+    if (!value) return "";
 
-/* ===== POSITIONS ===== */
-const positions = ["bottom","top","left","right"];
-
-/* ===== CARD BUILDER ===== */
-function buildCard(value) {
     const parts = value.split(" ");
     let color = parts[0];
     let text = parts[1] || parts[0];
 
     let cls = "wild";
+
     if (color === "Red") cls = "red";
     else if (color === "Blue") cls = "blue";
     else if (color === "Green") cls = "green";
     else if (color === "Yellow") cls = "yellow";
 
     return `
-        <div class="card" data-value="${value}">
-            <div class="card-inner ${cls}">
-                <div class="center">${text}</div>
-            </div>
-        </div>`;
+        <div class="card ${cls}">
+            <div class="corner top-left">${text}</div>
+            <div class="corner bottom-right">${text}</div>
+            <div class="center">${text}</div>
+        </div>
+    `;
 }
 
-/* ===== ARC LAYOUT ===== */
-function layoutArc(container) {
-    const cards = container.querySelectorAll(".card");
-    const total = cards.length;
-    const spread = 60; // arc spread
+/* 🔄 DATA FETCH */
+async function updateData() {
+    try {
+        const res = await fetch('/api/update');
+        const data = await res.json();
 
-    cards.forEach((card, i) => {
-        const offset = i - (total - 1) / 2;
-        const angle = offset * (spread / total);
-        const x = offset * 30;
+        let html = "";
 
-        gsap.set(card, {
-            x: x,
-            y: Math.abs(offset) * 5,
-            rotation: angle
-        });
-    });
-}
+        if (!data || Object.keys(data).length === 0) {
+            document.getElementById('dashboard').innerHTML = "WAITING FOR DATA...";
+            return;
+        }
 
-/* ===== RENDER ===== */
-function render(data) {
-    let html = "";
-    let i = 0;
+        for (const [uid, cards] of Object.entries(data)) {
 
-    for (const [uid, cards] of Object.entries(data)) {
-
-        if (i === 0) {
-            // bottom player = ARC
             html += `
-            <div class="player bottom">
-                <div class="hand" data-hand>
-                    ${cards.map(c => buildCard(c)).join("")}
+                <div class="player">
+                    <div class="uid">PLAYER: ${uid}</div>
+                    <div class="cards">
+                        ${Array.isArray(cards) ? cards.map(c => formatCard(c)).join("") : ""}
+                    </div>
                 </div>
-            </div>`;
-        } else {
-            html += `
-            <div class="player ${positions[i]}">
-                ${cards.map(c => buildCard(c)).join("")}
-            </div>`;
+            `;
         }
 
-        i++;
+        document.getElementById('dashboard').innerHTML = html;
+        document.getElementById('status').innerText =
+            "SYNC: " + new Date().toLocaleTimeString();
+
+    } catch (e) {
+        console.error(e);
     }
-
-    document.getElementById("players").innerHTML = html;
-
-    const hand = document.querySelector("[data-hand]");
-    if (hand) layoutArc(hand);
 }
 
-/* ===== DETECT MOVE ===== */
-function detect(prev, curr) {
-    for (const uid in prev) {
-        const a = prev[uid] || [];
-        const b = curr[uid] || [];
-
-        if (a.length > b.length) {
-            return a.find(x => !b.includes(x));
-        }
-    }
-    return null;
-}
-
-/* ===== PLAY ANIMATION ===== */
-function animatePlay(value) {
-    const card = document.querySelector(`.card[data-value="${value}"]`);
-    if (!card) return;
-
-    const rect = card.getBoundingClientRect();
-    const pile = document.getElementById("pile");
-    const pileRect = pile.getBoundingClientRect();
-
-    const clone = card.cloneNode(true);
-    clone.style.position = "fixed";
-    clone.style.left = rect.left + "px";
-    clone.style.top = rect.top + "px";
-    document.body.appendChild(clone);
-
-    gsap.to(clone, {
-        x: pileRect.left - rect.left,
-        y: pileRect.top - rect.top,
-        rotation: 360,
-        scale: 1.2,
-        duration: 0.6,
-        ease: "power3.out",
-        onComplete: () => {
-            pile.innerHTML = clone.outerHTML;
-            clone.remove();
-        }
-    });
-}
-
-/* ===== LOOP ===== */
-async function update() {
-    const res = await fetch('/api/update');
-    const data = await res.json();
-
-    const move = detect(lastState, data);
-
-    render(data);
-
-    if (move && move !== lastMove) {
-        animatePlay(move);
-        lastMove = move;
-    }
-
-    lastState = JSON.parse(JSON.stringify(data));
-}
-
-setInterval(update, 800);
-update();
+setInterval(updateData, 800);
+updateData();
 
 </script>
 
