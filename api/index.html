@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WAYFLOW | SPY OS</title>
+    <style>
+        :root { --neon-green: #00ff41; --neon-pink: #ff00ff; --dark-bg: #0d0d0d; }
+        body { background: var(--dark-bg); color: var(--neon-green); font-family: 'Courier New', monospace; padding: 20px; text-transform: uppercase; }
+        .container { border: 2px solid #333; padding: 20px; border-radius: 10px; background: rgba(255,255,255,0.02); }
+        h1 { color: var(--neon-pink); border-bottom: 2px solid var(--neon-pink); padding-bottom: 10px; text-shadow: 0 0 10px var(--neon-pink); }
+        .player-hand { margin: 20px 0; padding: 15px; border: 1px solid #444; border-radius: 8px; background: #111; }
+        .uid { color: var(--neon-pink); font-size: 0.9em; font-weight: bold; margin-bottom: 10px; display: block; }
+        .cards-list { display: flex; flex-wrap: wrap; gap: 10px; }
+        .card { background: #222; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--neon-green); color: #fff; font-weight: bold; }
+        .status { font-size: 0.8em; color: #444; text-align: right; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📡 LIVE TRANSMISSION: VERCEL_EDGE</h1>
+        <div id="dashboard">WAITING FOR UPLINK...</div>
+        <div class="status" id="last-update">SYNC: OFFLINE</div>
+    </div>
+
+    <script>
+        async function updateData() {
+            try {
+                // Fetch from the local API endpoint we created
+                const res = await fetch('/api/update');
+                const data = await res.json();
+                
+                let html = "";
+                const entries = Object.entries(data);
+
+                if (entries.length === 0) {
+                    document.getElementById('dashboard').innerHTML = "SIGNAL IDLE...";
+                    return;
+                }
+
+                for (const [uid, cards] of entries) {
+                    html += `<div class="player-hand">
+                                <span class="uid">TARGET_UID: ${uid}</span>
+                                <div class="cards-list">
+                                    ${cards.map(c => `<div class="card">${c}</div>`).join('')}
+                                </div>
+                             </div>`;
+                }
+                document.getElementById('dashboard').innerHTML = html;
+                document.getElementById('last-update').innerHTML = "LAST SYNC: " + new Date().toLocaleTimeString();
+            } catch (e) { console.error("Sync Error"); }
+        }
+        setInterval(updateData, 800);
+        updateData();
+    </script>
+</body>
+</html>
