@@ -1,56 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>WAYFLOW | SPY OS</title>
-    <style>
-        :root { --neon-green: #00ff41; --neon-pink: #ff00ff; --dark-bg: #0d0d0d; }
-        body { background: var(--dark-bg); color: var(--neon-green); font-family: 'Courier New', monospace; padding: 20px; text-transform: uppercase; }
-        .container { border: 2px solid #333; padding: 20px; border-radius: 10px; background: rgba(255,255,255,0.02); }
-        h1 { color: var(--neon-pink); border-bottom: 2px solid var(--neon-pink); padding-bottom: 10px; text-shadow: 0 0 10px var(--neon-pink); }
-        .player-hand { margin: 20px 0; padding: 15px; border: 1px solid #444; border-radius: 8px; background: #111; }
-        .uid { color: var(--neon-pink); font-size: 0.9em; font-weight: bold; margin-bottom: 10px; display: block; }
-        .cards-list { display: flex; flex-wrap: wrap; gap: 10px; }
-        .card { background: #222; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--neon-green); color: #fff; font-weight: bold; }
-        .status { font-size: 0.8em; color: #444; text-align: right; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<title>WAYFLOW | SPY OS</title>
+
+<style>
+:root {
+    --neon-green: #00ff41;
+    --neon-pink: #ff00ff;
+    --dark-bg: #0d0d0d;
+}
+
+body {
+    background: radial-gradient(circle at center, #111 0%, #000 100%);
+    color: var(--neon-green);
+    font-family: 'Courier New', monospace;
+    padding: 20px;
+}
+
+.container {
+    border: 2px solid #222;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    box-shadow: 0 0 20px rgba(0,255,65,0.1);
+}
+
+h1 {
+    color: var(--neon-pink);
+    border-bottom: 2px solid var(--neon-pink);
+    padding-bottom: 10px;
+    text-shadow: 0 0 15px var(--neon-pink);
+}
+
+.player-hand {
+    margin: 25px 0;
+    padding: 15px;
+    border: 1px solid #333;
+    border-radius: 10px;
+    background: #0a0a0a;
+}
+
+.uid {
+    color: var(--neon-pink);
+    font-size: 0.85em;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.cards-list {
+    display: flex;
+    gap: 12px;
+    perspective: 1000px;
+}
+
+/* CARD DESIGN */
+.card {
+    width: 70px;
+    height: 100px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #ffffff, #dcdcdc);
+    color: black;
+    position: relative;
+    font-weight: bold;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    transform-style: preserve-3d;
+    transition: transform 0.2s ease;
+}
+
+/* hover 3D */
+.card:hover {
+    transform: rotateY(15deg) rotateX(10deg) scale(1.05);
+}
+
+/* corners */
+.rank {
+    position: absolute;
+    font-size: 14px;
+}
+
+.rank.top {
+    top: 6px;
+    left: 8px;
+}
+
+.rank.bottom {
+    bottom: 6px;
+    right: 8px;
+    transform: rotate(180deg);
+}
+
+/* center suit */
+.suit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+}
+
+/* red suits */
+.red {
+    color: red;
+}
+
+.status {
+    font-size: 0.75em;
+    color: #555;
+    text-align: right;
+    margin-top: 10px;
+}
+</style>
+
 </head>
+
 <body>
-    <div class="container">
-        <h1>📡 LIVE TRANSMISSION: VERCEL_EDGE</h1>
-        <div id="dashboard">WAITING FOR UPLINK...</div>
-        <div class="status" id="last-update">SYNC: OFFLINE</div>
-    </div>
 
-    <script>
-        async function updateData() {
-            try {
-                // Fetch from the local API endpoint we created
-                const res = await fetch('/api/update');
-                const data = await res.json();
-                
-                let html = "";
-                const entries = Object.entries(data);
+<div class="container">
+    <h1>📡 LIVE TRANSMISSION: VERCEL_EDGE</h1>
+    <div id="dashboard">WAITING FOR UPLINK...</div>
+    <div class="status" id="last-update">SYNC: OFFLINE</div>
+</div>
 
-                if (entries.length === 0) {
-                    document.getElementById('dashboard').innerHTML = "SIGNAL IDLE...";
-                    return;
-                }
+<script>
 
-                for (const [uid, cards] of entries) {
-                    html += `<div class="player-hand">
-                                <span class="uid">TARGET_UID: ${uid}</span>
-                                <div class="cards-list">
-                                    ${cards.map(c => `<div class="card">${c}</div>`).join('')}
-                                </div>
-                             </div>`;
-                }
-                document.getElementById('dashboard').innerHTML = html;
-                document.getElementById('last-update').innerHTML = "LAST SYNC: " + new Date().toLocaleTimeString();
-            } catch (e) { console.error("Sync Error"); }
+// Convert numeric value → real card
+function formatCard(value) {
+    const suits = ["♠", "♥", "♦", "♣"];
+
+    const rankNum = value % 13 || 13;
+    const suit = suits[Math.floor(value / 13) % 4];
+
+    const rank =
+        rankNum === 1 ? "A" :
+        rankNum === 11 ? "J" :
+        rankNum === 12 ? "Q" :
+        rankNum === 13 ? "K" :
+        rankNum;
+
+    const isRed = suit === "♥" || suit === "♦";
+
+    return `
+        <div class="card ${isRed ? "red" : ""}">
+            <div class="rank top">${rank}</div>
+            <div class="rank bottom">${rank}</div>
+            <div class="suit">${suit}</div>
+        </div>
+    `;
+}
+
+async function updateData() {
+    try {
+        const res = await fetch('/api/update');
+        const data = await res.json();
+
+        let html = "";
+        const entries = Object.entries(data);
+
+        if (entries.length === 0) {
+            document.getElementById('dashboard').innerHTML = "SIGNAL IDLE...";
+            return;
         }
-        setInterval(updateData, 800);
-        updateData();
-    </script>
+
+        for (const [uid, cards] of entries) {
+            html += `
+                <div class="player-hand">
+                    <span class="uid">TARGET_UID: ${uid}</span>
+                    <div class="cards-list">
+                        ${cards.map(c => formatCard(c)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('dashboard').innerHTML = html;
+        document.getElementById('last-update').innerHTML =
+            "LAST SYNC: " + new Date().toLocaleTimeString();
+
+    } catch (e) {
+        console.error("Sync Error", e);
+    }
+}
+
+setInterval(updateData, 800);
+updateData();
+
+</script>
+
 </body>
 </html>
