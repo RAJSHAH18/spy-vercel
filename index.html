@@ -2,109 +2,83 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>UNO LIVE TRACKER</title>
+<title>UNO ENGINE PRO</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
 <style>
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: radial-gradient(circle at center, #0a0a0a, #000);
-    color: #fff;
+    background: radial-gradient(circle at center, #0a0f1f, #000);
+    font-family: sans-serif;
+    color: white;
 }
 
-/* TABLE LAYOUT */
+/* TABLE */
 .table {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
+    position: relative;
+    height: 100vh;
 }
 
-/* PLAYER BLOCK */
+/* CENTER PILE */
+.pile {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90px;
+    height: 130px;
+}
+
+/* PLAYER ZONES */
 .player {
-    margin: 15px 0;
-    width: 95%;
-    max-width: 900px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 15px;
-}
-
-.uid {
-    font-size: 14px;
-    color: #ff4df2;
-    margin-bottom: 10px;
-}
-
-/* CARD ROW */
-.cards {
+    position: absolute;
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
+    gap: 6px;
 }
 
-/* UNO CARD */
+/* positions */
+.bottom { bottom: 20px; left: 50%; transform: translateX(-50%); }
+.top { top: 20px; left: 50%; transform: translateX(-50%); }
+.left { left: 20px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+.right { right: 20px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+
+/* CARD */
 .card {
     width: 70px;
     height: 110px;
-    border-radius: 14px;
+    border-radius: 16px;
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 26px;
-    color: white;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
-    transition: transform 0.2s ease;
-}
-
-.card:hover {
-    transform: scale(1.1);
-}
-
-/* corner numbers */
-.corner {
-    position: absolute;
-    font-size: 12px;
-}
-
-.top-left {
-    top: 6px;
-    left: 8px;
-}
-
-.bottom-right {
-    bottom: 6px;
-    right: 8px;
-    transform: rotate(180deg);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    transform-origin: center;
 }
 
 /* center oval */
 .center {
     background: white;
     color: black;
-    border-radius: 50%;
     width: 40px;
     height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border-radius: 50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
 }
 
 /* COLORS */
-.red { background: #e53935; }
-.blue { background: #1e88e5; }
-.green { background: #43a047; }
-.yellow { background: #fdd835; color: black; }
-.wild { background: linear-gradient(45deg, red, blue, green, yellow); }
+.red { background: linear-gradient(135deg,#ff3b3b,#a00000); }
+.blue { background: linear-gradient(135deg,#3b82ff,#002e80); }
+.green { background: linear-gradient(135deg,#3bff57,#007a2e); }
+.yellow { background: linear-gradient(135deg,#ffd93b,#b38f00); color:black;}
+.wild { background: conic-gradient(red,blue,green,yellow); }
 
-/* STATUS */
-.status {
-    text-align: center;
-    margin-top: 10px;
-    font-size: 12px;
-    color: #888;
+/* glow active */
+.active {
+    box-shadow: 0 0 20px #00ffea;
 }
 </style>
 </head>
@@ -112,15 +86,28 @@ body {
 <body>
 
 <div class="table">
-    <h2>🎮 UNO LIVE TRACKER</h2>
-    <div id="dashboard">Connecting...</div>
-    <div class="status" id="status">SYNC: OFFLINE</div>
+
+    <!-- center pile -->
+    <div class="pile" id="pile"></div>
+
+    <!-- players -->
+    <div id="players"></div>
+
 </div>
 
 <script>
 
-/* 🔥 UNO CARD BUILDER */
-function formatCard(value) {
+/* ===== ENGINE STATE ===== */
+let lastState = {};
+let lastTopCard = null;
+
+/* ===== PLAYER POSITIONS ===== */
+function getPosition(i) {
+    return ["bottom","top","left","right"][i % 4];
+}
+
+/* ===== CARD BUILDER ===== */
+function buildCard(value) {
     if (!value) return "";
 
     const parts = value.split(" ");
@@ -128,57 +115,101 @@ function formatCard(value) {
     let text = parts[1] || parts[0];
 
     let cls = "wild";
-
     if (color === "Red") cls = "red";
     else if (color === "Blue") cls = "blue";
     else if (color === "Green") cls = "green";
     else if (color === "Yellow") cls = "yellow";
 
-    return `
-        <div class="card ${cls}">
-            <div class="corner top-left">${text}</div>
-            <div class="corner bottom-right">${text}</div>
-            <div class="center">${text}</div>
-        </div>
-    `;
+    return `<div class="card ${cls}" data-value="${value}">
+                <div class="center">${text}</div>
+            </div>`;
 }
 
-/* 🔄 DATA FETCH */
-async function updateData() {
+/* ===== RENDER PLAYERS ===== */
+function renderPlayers(data) {
+    let html = "";
+    let i = 0;
+
+    for (const [uid, cards] of Object.entries(data)) {
+        html += `
+            <div class="player ${getPosition(i)}" data-uid="${uid}">
+                ${cards.map(c => buildCard(c)).join("")}
+            </div>
+        `;
+        i++;
+    }
+
+    document.getElementById("players").innerHTML = html;
+}
+
+/* ===== FIND LAST PLAYED CARD ===== */
+function detectMove(prev, curr) {
+    for (const uid in prev) {
+        const oldCards = prev[uid] || [];
+        const newCards = curr[uid] || [];
+
+        if (oldCards.length > newCards.length) {
+            // card removed = played
+            return oldCards.find(c => !newCards.includes(c));
+        }
+    }
+    return null;
+}
+
+/* ===== ANIMATE TO PILE ===== */
+function animateToPile(cardValue) {
+    const cards = document.querySelectorAll(`.card[data-value="${cardValue}"]`);
+    if (!cards.length) return;
+
+    const card = cards[0];
+    const pile = document.getElementById("pile");
+
+    const rect = card.getBoundingClientRect();
+    const pileRect = pile.getBoundingClientRect();
+
+    const clone = card.cloneNode(true);
+    clone.style.position = "fixed";
+    clone.style.left = rect.left + "px";
+    clone.style.top = rect.top + "px";
+    document.body.appendChild(clone);
+
+    gsap.to(clone, {
+        x: pileRect.left - rect.left,
+        y: pileRect.top - rect.top,
+        scale: 1.2,
+        duration: 0.5,
+        onComplete: () => {
+            pile.innerHTML = clone.outerHTML;
+            clone.remove();
+        }
+    });
+}
+
+/* ===== MAIN UPDATE LOOP ===== */
+async function update() {
     try {
         const res = await fetch('/api/update');
         const data = await res.json();
 
-        let html = "";
+        const move = detectMove(lastState, data);
 
-        if (!data || Object.keys(data).length === 0) {
-            document.getElementById('dashboard').innerHTML = "WAITING FOR DATA...";
-            return;
+        renderPlayers(data);
+
+        if (move && move !== lastTopCard) {
+            animateToPile(move);
+            lastTopCard = move;
         }
 
-        for (const [uid, cards] of Object.entries(data)) {
+        lastState = JSON.parse(JSON.stringify(data));
 
-            html += `
-                <div class="player">
-                    <div class="uid">PLAYER: ${uid}</div>
-                    <div class="cards">
-                        ${Array.isArray(cards) ? cards.map(c => formatCard(c)).join("") : ""}
-                    </div>
-                </div>
-            `;
-        }
-
-        document.getElementById('dashboard').innerHTML = html;
-        document.getElementById('status').innerText =
-            "SYNC: " + new Date().toLocaleTimeString();
-
-    } catch (e) {
-        console.error(e);
+    } catch(e) {
+        console.log(e);
     }
 }
 
-setInterval(updateData, 800);
-updateData();
+/* LOOP */
+setInterval(update, 800);
+update();
 
 </script>
 
