@@ -2,186 +2,178 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>WAYFLOW | SPY OS</title>
+<title>UNO LIVE TRACKER</title>
 
 <style>
-:root {
-    --neon-green: #00ff41;
-    --neon-pink: #ff00ff;
-    --dark-bg: #0d0d0d;
-}
-
 body {
-    background: radial-gradient(circle, #111, #000);
-    color: var(--neon-green);
-    font-family: 'Courier New', monospace;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: radial-gradient(circle at center, #0a0a0a, #000);
+    color: #fff;
+}
+
+/* TABLE LAYOUT */
+.table {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     padding: 20px;
 }
 
-/* container */
-.container {
-    border: 2px solid #222;
-    padding: 20px;
+/* PLAYER BLOCK */
+.player {
+    margin: 15px 0;
+    width: 95%;
+    max-width: 900px;
+    background: rgba(255,255,255,0.05);
     border-radius: 12px;
-    background: rgba(255,255,255,0.03);
-}
-
-/* title */
-h1 {
-    color: var(--neon-pink);
-    border-bottom: 2px solid var(--neon-pink);
-    padding-bottom: 10px;
-}
-
-/* player block */
-.player-hand {
-    margin: 20px 0;
     padding: 15px;
-    border: 1px solid #333;
-    border-radius: 10px;
-    background: #0a0a0a;
 }
 
 .uid {
-    color: var(--neon-pink);
-    font-size: 0.85em;
+    font-size: 14px;
+    color: #ff4df2;
     margin-bottom: 10px;
-    display: block;
 }
 
-/* cards row */
-.cards-list {
+/* CARD ROW */
+.cards {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
 }
 
-/* CARD */
+/* UNO CARD */
 .card {
     width: 70px;
-    height: 100px;
-    border-radius: 12px;
+    height: 110px;
+    border-radius: 14px;
     position: relative;
-    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    color: #000;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+    font-weight: bold;
+    font-size: 26px;
+    color: white;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
     transition: transform 0.2s ease;
 }
 
-/* hover */
 .card:hover {
-    transform: scale(1.08);
+    transform: scale(1.1);
 }
 
-/* corners */
-.rank.top {
+/* corner numbers */
+.corner {
     position: absolute;
-    top: 6px;
-    left: 8px;
     font-size: 12px;
 }
 
-.rank.bottom {
-    position: absolute;
+.top-left {
+    top: 6px;
+    left: 8px;
+}
+
+.bottom-right {
     bottom: 6px;
     right: 8px;
     transform: rotate(180deg);
-    font-size: 12px;
 }
 
-/* center */
+/* center oval */
 .center {
-    font-size: 22px;
+    background: white;
+    color: black;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* status */
+/* COLORS */
+.red { background: #e53935; }
+.blue { background: #1e88e5; }
+.green { background: #43a047; }
+.yellow { background: #fdd835; color: black; }
+.wild { background: linear-gradient(45deg, red, blue, green, yellow); }
+
+/* STATUS */
 .status {
-    font-size: 0.75em;
-    color: #666;
-    text-align: right;
+    text-align: center;
     margin-top: 10px;
+    font-size: 12px;
+    color: #888;
 }
 </style>
-
 </head>
 
 <body>
 
-<div class="container">
-    <h1>📡 LIVE TRANSMISSION: VERCEL_EDGE</h1>
-    <div id="dashboard">WAITING FOR UPLINK...</div>
-    <div class="status" id="last-update">SYNC: OFFLINE</div>
+<div class="table">
+    <h2>🎮 UNO LIVE TRACKER</h2>
+    <div id="dashboard">Connecting...</div>
+    <div class="status" id="status">SYNC: OFFLINE</div>
 </div>
 
 <script>
 
-/* 🔥 PERFECT CARD FORMATTER (MATCHES YOUR BACKEND) */
+/* 🔥 UNO CARD BUILDER */
 function formatCard(value) {
-    if (!value || typeof value !== "string") return "";
+    if (!value) return "";
 
     const parts = value.split(" ");
-
     let color = parts[0];
-    let text = parts[1] || parts[0]; // handles WILD, +2, etc
+    let text = parts[1] || parts[0];
 
-    const colorMap = {
-        "Red": "#ff4d4d",
-        "Blue": "#4da6ff",
-        "Green": "#4dff88",
-        "Yellow": "#ffd24d"
-    };
+    let cls = "wild";
 
-    let bg = colorMap[color] || "#222";
-    let textColor = colorMap[color] ? "#000" : "#fff";
+    if (color === "Red") cls = "red";
+    else if (color === "Blue") cls = "blue";
+    else if (color === "Green") cls = "green";
+    else if (color === "Yellow") cls = "yellow";
 
     return `
-        <div class="card" style="background:${bg}; color:${textColor};">
-            <div class="rank top">${text}</div>
-            <div class="rank bottom">${text}</div>
+        <div class="card ${cls}">
+            <div class="corner top-left">${text}</div>
+            <div class="corner bottom-right">${text}</div>
             <div class="center">${text}</div>
         </div>
     `;
 }
 
+/* 🔄 DATA FETCH */
 async function updateData() {
     try {
         const res = await fetch('/api/update');
         const data = await res.json();
 
         let html = "";
-        const entries = Object.entries(data || {});
 
-        if (entries.length === 0) {
-            document.getElementById('dashboard').innerHTML = "SIGNAL IDLE...";
+        if (!data || Object.keys(data).length === 0) {
+            document.getElementById('dashboard').innerHTML = "WAITING FOR DATA...";
             return;
         }
 
-        for (const [uid, cards] of entries) {
+        for (const [uid, cards] of Object.entries(data)) {
 
             html += `
-                <div class="player-hand">
-                    <span class="uid">TARGET_UID: ${uid}</span>
-                    <div class="cards-list">
-                        ${
-                            Array.isArray(cards)
-                            ? cards.map(c => formatCard(c)).join('')
-                            : ''
-                        }
+                <div class="player">
+                    <div class="uid">PLAYER: ${uid}</div>
+                    <div class="cards">
+                        ${Array.isArray(cards) ? cards.map(c => formatCard(c)).join("") : ""}
                     </div>
                 </div>
             `;
         }
 
         document.getElementById('dashboard').innerHTML = html;
-        document.getElementById('last-update').innerHTML =
-            "LAST SYNC: " + new Date().toLocaleTimeString();
+        document.getElementById('status').innerText =
+            "SYNC: " + new Date().toLocaleTimeString();
 
     } catch (e) {
-        console.error("Sync Error", e);
+        console.error(e);
     }
 }
 
