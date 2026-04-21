@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>UNO ENGINE PRO</title>
+<title>UNO ARC ENGINE</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
@@ -11,13 +11,14 @@ body {
     margin: 0;
     background: radial-gradient(circle at center, #0a0f1f, #000);
     font-family: sans-serif;
-    color: white;
+    overflow: hidden;
 }
 
 /* TABLE */
 .table {
-    position: relative;
+    width: 100vw;
     height: 100vh;
+    position: relative;
 }
 
 /* CENTER PILE */
@@ -26,90 +27,85 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 90px;
-    height: 130px;
 }
 
-/* PLAYER ZONES */
+/* PLAYERS */
 .player {
     position: absolute;
-    display: flex;
-    gap: 6px;
 }
 
-/* positions */
-.bottom { bottom: 20px; left: 50%; transform: translateX(-50%); }
-.top { top: 20px; left: 50%; transform: translateX(-50%); }
-.left { left: 20px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
-.right { right: 20px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+.bottom { bottom: 10px; left: 50%; transform: translateX(-50%); }
+.top { top: 10px; left: 50%; transform: translateX(-50%); }
+.left { left: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+.right { right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+
+/* ARC HAND */
+.hand {
+    position: relative;
+    height: 140px;
+}
 
 /* CARD */
 .card {
     width: 70px;
     height: 110px;
-    border-radius: 16px;
-    position: relative;
+    position: absolute;
+    border-radius: 14px;
+    transform-origin: center bottom;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+    cursor: pointer;
+}
+
+/* CARD INNER */
+.card-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
-    transform-origin: center;
 }
 
-/* center oval */
+/* CENTER */
 .center {
-    background: white;
-    color: black;
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    background: white;
+    color: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* COLORS */
-.red { background: linear-gradient(135deg,#ff3b3b,#a00000); }
-.blue { background: linear-gradient(135deg,#3b82ff,#002e80); }
-.green { background: linear-gradient(135deg,#3bff57,#007a2e); }
-.yellow { background: linear-gradient(135deg,#ffd93b,#b38f00); color:black;}
-.wild { background: conic-gradient(red,blue,green,yellow); }
-
-/* glow active */
-.active {
-    box-shadow: 0 0 20px #00ffea;
-}
+.red { background:#e53935; }
+.blue { background:#1e88e5; }
+.green { background:#43a047; }
+.yellow { background:#fdd835; color:black;}
+.wild { background:conic-gradient(red,blue,green,yellow); }
 </style>
 </head>
 
 <body>
 
 <div class="table">
-
-    <!-- center pile -->
     <div class="pile" id="pile"></div>
-
-    <!-- players -->
     <div id="players"></div>
-
 </div>
 
 <script>
 
 /* ===== ENGINE STATE ===== */
 let lastState = {};
-let lastTopCard = null;
+let lastMove = null;
 
-/* ===== PLAYER POSITIONS ===== */
-function getPosition(i) {
-    return ["bottom","top","left","right"][i % 4];
-}
+/* ===== POSITIONS ===== */
+const positions = ["bottom","top","left","right"];
 
 /* ===== CARD BUILDER ===== */
 function buildCard(value) {
-    if (!value) return "";
-
     const parts = value.split(" ");
     let color = parts[0];
     let text = parts[1] || parts[0];
@@ -120,51 +116,84 @@ function buildCard(value) {
     else if (color === "Green") cls = "green";
     else if (color === "Yellow") cls = "yellow";
 
-    return `<div class="card ${cls}" data-value="${value}">
+    return `
+        <div class="card" data-value="${value}">
+            <div class="card-inner ${cls}">
                 <div class="center">${text}</div>
-            </div>`;
+            </div>
+        </div>`;
 }
 
-/* ===== RENDER PLAYERS ===== */
-function renderPlayers(data) {
+/* ===== ARC LAYOUT ===== */
+function layoutArc(container) {
+    const cards = container.querySelectorAll(".card");
+    const total = cards.length;
+    const spread = 60; // arc spread
+
+    cards.forEach((card, i) => {
+        const offset = i - (total - 1) / 2;
+        const angle = offset * (spread / total);
+        const x = offset * 30;
+
+        gsap.set(card, {
+            x: x,
+            y: Math.abs(offset) * 5,
+            rotation: angle
+        });
+    });
+}
+
+/* ===== RENDER ===== */
+function render(data) {
     let html = "";
     let i = 0;
 
     for (const [uid, cards] of Object.entries(data)) {
-        html += `
-            <div class="player ${getPosition(i)}" data-uid="${uid}">
+
+        if (i === 0) {
+            // bottom player = ARC
+            html += `
+            <div class="player bottom">
+                <div class="hand" data-hand>
+                    ${cards.map(c => buildCard(c)).join("")}
+                </div>
+            </div>`;
+        } else {
+            html += `
+            <div class="player ${positions[i]}">
                 ${cards.map(c => buildCard(c)).join("")}
-            </div>
-        `;
+            </div>`;
+        }
+
         i++;
     }
 
     document.getElementById("players").innerHTML = html;
+
+    const hand = document.querySelector("[data-hand]");
+    if (hand) layoutArc(hand);
 }
 
-/* ===== FIND LAST PLAYED CARD ===== */
-function detectMove(prev, curr) {
+/* ===== DETECT MOVE ===== */
+function detect(prev, curr) {
     for (const uid in prev) {
-        const oldCards = prev[uid] || [];
-        const newCards = curr[uid] || [];
+        const a = prev[uid] || [];
+        const b = curr[uid] || [];
 
-        if (oldCards.length > newCards.length) {
-            // card removed = played
-            return oldCards.find(c => !newCards.includes(c));
+        if (a.length > b.length) {
+            return a.find(x => !b.includes(x));
         }
     }
     return null;
 }
 
-/* ===== ANIMATE TO PILE ===== */
-function animateToPile(cardValue) {
-    const cards = document.querySelectorAll(`.card[data-value="${cardValue}"]`);
-    if (!cards.length) return;
-
-    const card = cards[0];
-    const pile = document.getElementById("pile");
+/* ===== PLAY ANIMATION ===== */
+function animatePlay(value) {
+    const card = document.querySelector(`.card[data-value="${value}"]`);
+    if (!card) return;
 
     const rect = card.getBoundingClientRect();
+    const pile = document.getElementById("pile");
     const pileRect = pile.getBoundingClientRect();
 
     const clone = card.cloneNode(true);
@@ -176,8 +205,10 @@ function animateToPile(cardValue) {
     gsap.to(clone, {
         x: pileRect.left - rect.left,
         y: pileRect.top - rect.top,
+        rotation: 360,
         scale: 1.2,
-        duration: 0.5,
+        duration: 0.6,
+        ease: "power3.out",
         onComplete: () => {
             pile.innerHTML = clone.outerHTML;
             clone.remove();
@@ -185,29 +216,23 @@ function animateToPile(cardValue) {
     });
 }
 
-/* ===== MAIN UPDATE LOOP ===== */
+/* ===== LOOP ===== */
 async function update() {
-    try {
-        const res = await fetch('/api/update');
-        const data = await res.json();
+    const res = await fetch('/api/update');
+    const data = await res.json();
 
-        const move = detectMove(lastState, data);
+    const move = detect(lastState, data);
 
-        renderPlayers(data);
+    render(data);
 
-        if (move && move !== lastTopCard) {
-            animateToPile(move);
-            lastTopCard = move;
-        }
-
-        lastState = JSON.parse(JSON.stringify(data));
-
-    } catch(e) {
-        console.log(e);
+    if (move && move !== lastMove) {
+        animatePlay(move);
+        lastMove = move;
     }
+
+    lastState = JSON.parse(JSON.stringify(data));
 }
 
-/* LOOP */
 setInterval(update, 800);
 update();
 
