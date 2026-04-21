@@ -1,25 +1,23 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+// Vercel automatically injects these if you connected the database
+const redis = Redis.fromEnv();
 
 export default async function handler(req, res) {
-    // Allow the website to read this data
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
     if (req.method === 'POST') {
-        // SAVE DATA: Python sends cards here
         const data = req.body;
-        await kv.set('game_state', data);
+        await redis.set('game_state', JSON.stringify(data));
         return res.status(200).json({ success: true });
     } 
 
     if (req.method === 'GET') {
-        // READ DATA: HTML Dashboard gets cards from here
-        const state = await kv.get('game_state');
+        const state = await redis.get('game_state');
         return res.status(200).json(state || {});
     }
 
