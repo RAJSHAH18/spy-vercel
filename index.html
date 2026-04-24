@@ -41,6 +41,40 @@ body::before {
     margin: 25px auto;
     max-width: 900px;
     transform: rotateX(10deg);
+    padding: 15px;
+    border-radius: 20px;
+    transition: all 0.4s ease;
+    border: 2px solid transparent;
+}
+
+/* 🔥 ACTIVE TURN HIGHLIGHT 🔥 */
+.active-turn {
+    border-color: #00ffcc;
+    background: rgba(0, 255, 204, 0.08);
+    box-shadow: 0 0 30px rgba(0, 255, 204, 0.2);
+    transform: rotateX(5deg) scale(1.02);
+    animation: turnPulse 1.5s infinite alternate;
+}
+
+@keyframes turnPulse {
+    from { box-shadow: 0 0 15px rgba(0, 255, 204, 0.2); }
+    to { box-shadow: 0 0 35px rgba(0, 255, 204, 0.5); }
+}
+
+.turn-badge {
+    display: none;
+    background: #00ffcc;
+    color: #000;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.active-turn .turn-badge {
+    display: inline-block;
 }
 
 /* card row */
@@ -48,6 +82,7 @@ body::before {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+    margin-top: 10px;
 }
 
 /* ===== UNO CARD ===== */
@@ -62,25 +97,16 @@ body::before {
     animation: deal 0.4s ease;
 }
 
-/* deal animation */
 @keyframes deal {
-    from {
-        transform: translateY(-200px) scale(0.5);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
+    from { transform: translateY(-200px) scale(0.5); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-/* hover lift */
 .card:hover {
     transform: translateY(-12px) rotateY(12deg) scale(1.08);
     box-shadow: 0 15px 40px rgba(0,0,0,1);
 }
 
-/* card inner */
 .card-inner {
     width: 100%;
     height: 100%;
@@ -91,7 +117,6 @@ body::before {
     position: relative;
 }
 
-/* oval center */
 .center {
     width: 45px;
     height: 45px;
@@ -104,40 +129,29 @@ body::before {
     font-weight: bold;
 }
 
-/* corners */
-.corner {
-    position: absolute;
-    font-size: 12px;
-}
-
+.corner { position: absolute; font-size: 12px; }
 .top-left { top: 6px; left: 8px; }
-.bottom-right {
-    bottom: 6px;
-    right: 8px;
-    transform: rotate(180deg);
-}
+.bottom-right { bottom: 6px; right: 8px; transform: rotate(180deg); }
 
 /* COLORS */
 .red { background: linear-gradient(135deg, #ff3b3b, #b30000); }
 .blue { background: linear-gradient(135deg, #3b82ff, #003cb3); }
 .green { background: linear-gradient(135deg, #3bff57, #009933); }
 .yellow { background: linear-gradient(135deg, #ffd93b, #b38f00); color: black; }
-.wild {
-    background: conic-gradient(red, blue, green, yellow);
-}
+.wild { background: conic-gradient(red, blue, green, yellow); }
 
-/* PLAYER LABEL */
 .uid {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     color: #ff00ff;
     font-size: 13px;
+    font-weight: bold;
 }
 
-/* status */
 .status {
     text-align: center;
     font-size: 12px;
     color: #aaa;
+    margin-top: 20px;
 }
 </style>
 </head>
@@ -145,9 +159,9 @@ body::before {
 <body>
 
 <div class="table">
-    <h2 style="text-align:center;">🎮 UNO LIVE ENGINE</h2>
+    <h2 style="text-align:center; color: #00ffcc; letter-spacing: 2px;">🎮 UNO LIVE ENGINE</h2>
     <div id="dashboard"></div>
-    <div class="status" id="status">SYNC...</div>
+    <div class="status" id="status">INITIALIZING SYNC...</div>
 </div>
 
 <script>
@@ -177,7 +191,7 @@ function formatCard(value) {
     `;
 }
 
-/* ===== SMOOTH UPDATE (NO FLICKER) ===== */
+/* ===== SMOOTH UPDATE (WITH TURN TRACKING) ===== */
 let lastData = "";
 
 async function updateData() {
@@ -186,15 +200,26 @@ async function updateData() {
         const data = await res.json();
 
         const jsonStr = JSON.stringify(data);
-        if (jsonStr === lastData) return; // prevent re-render
+        if (jsonStr === lastData) return; 
         lastData = jsonStr;
 
         let html = "";
+        const activeUID = data.active_player; // Captured from Python state
 
         for (const [uid, cards] of Object.entries(data || {})) {
+            // Skip the tracking key when rendering players
+            if (uid === "active_player") continue;
+
+            // Check if this player is currently acting
+            const isTurn = (uid.toString() === (activeUID || "").toString());
+            const activeClass = isTurn ? "active-turn" : "";
+
             html += `
-                <div class="player">
-                    <div class="uid">PLAYER: ${uid}</div>
+                <div class="player ${activeClass}">
+                    <div class="uid">
+                        PLAYER: ${uid} 
+                        <span class="turn-badge">YOUR TURN</span>
+                    </div>
                     <div class="cards">
                         ${cards.map(c => formatCard(c)).join("")}
                     </div>
@@ -204,14 +229,15 @@ async function updateData() {
 
         document.getElementById('dashboard').innerHTML = html;
         document.getElementById('status').innerText =
-            "SYNC: " + new Date().toLocaleTimeString();
+            "SYNCED: " + new Date().toLocaleTimeString();
 
     } catch (e) {
-        console.log("error", e);
+        console.log("Sync error", e);
+        document.getElementById('status').innerText = "OFFLINE - RETRYING...";
     }
 }
 
-/* smooth loop */
+/* smooth 800ms loop */
 setInterval(updateData, 800);
 updateData();
 
