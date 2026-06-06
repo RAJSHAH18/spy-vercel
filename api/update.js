@@ -1,4 +1,23 @@
+import Redis from 'ioredis';
+
 export default async function handler(req, res) {
+    try {
+        const redis = new Redis(process.env.REDIS_URL);
+
+        const pong = await redis.ping();
+
+        return res.json({
+            success: true,
+            pong
+        });
+
+    } catch (e) {
+        return res.status(500).json({
+            success: false,
+            error: e.message
+        });
+    }
+}export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
